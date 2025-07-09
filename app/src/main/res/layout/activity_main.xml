@@ -1,0 +1,128 @@
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/turnTextView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="C'est à toi de commencer !"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:id="@+id/turnCounterTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Tour 1/10"
+        android:textSize="18sp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="16dp" />
+
+    <Button
+        android:id="@+id/showQuestionButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Afficher la question"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:id="@+id/questionTextView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Question aléatoire"
+        android:visibility="gone"
+        android:textSize="16sp"
+        android:gravity="center"
+        android:layout_marginBottom="16dp" />
+
+
+
+    <LinearLayout
+        android:id="@+id/playersLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/validateButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Valider"
+        android:visibility="gone"
+        android:layout_marginTop="16dp" />
+
+
+
+
+
+    <!-- Envelopper la TextView dans un ScrollView pour permettre le défilement -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+            <Button
+                android:id="@+id/replayButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Rejouer la partie"
+                android:visibility="gone"
+                android:onClick="onReplayButtonClicked" />
+            <TextView
+                android:id="@+id/statsTextView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:text="Stats de la partie"
+                android:textSize="18sp"
+                android:padding="16dp" />
+
+
+        </LinearLayout>
+
+    </ScrollView>
+
+
+
+    <Button
+        android:id="@+id/tossCoinButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Lancer la pièce"
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/nextTurnButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Tour suivant"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/mainLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/quitButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Quitter le jeu"
+        android:layout_alignParentEnd="true"
+        android:layout_marginEnd="16dp" />
+
+
+
+</LinearLayout>
