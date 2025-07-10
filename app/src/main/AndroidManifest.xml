@@ -3,6 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <application
+        android:name=".FriendlyFireApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -12,23 +13,46 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FriendlyFire"
         tools:targetApi="31">
+
+        <!-- HomeActivity - Point d'entrée principal -->
         <activity
-            android:name=".WelcomeActivity"
+            android:name=".HomeActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-
-
             <meta-data
                 android:name="android.app.lib_name"
                 android:value="friendlyfire" />
         </activity>
-        <activity android:name=".MainActivity" />
-        <activity android:name=".ManagePlayersActivity" />
-        <activity android:name=".ManageQuestionsActivity" />
+
+        <!-- GameConfigActivity - Configuration des jeux -->
+        <activity
+            android:name=".GameConfigActivity"
+            android:exported="false"
+            android:parentActivityName=".HomeActivity" />
+
+        <!-- WelcomeActivity - Ancienne activité (gardée temporairement) -->
+        <activity
+            android:name=".WelcomeActivity"
+            android:exported="false"
+            android:parentActivityName=".GameConfigActivity" />
+
+        <!-- Autres activités -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:parentActivityName=".GameConfigActivity" />
+        <activity
+            android:name=".ManagePlayersActivity"
+            android:exported="false"
+            android:parentActivityName=".HomeActivity" />
+        <activity
+            android:name=".ManageQuestionsActivity"
+            android:exported="false"
+            android:parentActivityName=".HomeActivity" />
     </application>
 
 </manifest>

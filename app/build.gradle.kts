@@ -1,16 +1,18 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    id("kotlin-kapt")
+    id("dagger.hilt.android.plugin")
 }
 
 android {
     namespace = "com.example.friendlyfire"
-    compileSdk = 34 // Garde la dernière version stable pour la compilation.
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.example.friendlyfire"
-        minSdk = 31 // Assure une compatibilité avec Android 5.0+.
-        targetSdk = 31 // Cible Android 12 pour la compatibilité avec ton téléphone.
+        minSdk = 31
+        targetSdk = 31
         versionCode = 1
         versionName = "1.0"
 
@@ -40,8 +42,26 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation(libs.androidx.games.activity)
+    implementation("com.google.code.gson:gson:2.10")
+
+    // Hilt
+    implementation("com.google.dagger:hilt-android:2.48")
+    kapt("com.google.dagger:hilt-compiler:2.48")
+
+    // ViewModel
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.7.0")
+    implementation("androidx.activity:activity-ktx:1.8.2")
+
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // Navigation (for future hub development)
+    implementation("androidx.navigation:navigation-fragment-ktx:2.7.5")
+    implementation("androidx.navigation:navigation-ui-ktx:2.7.5")
+
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    implementation("com.google.code.gson:gson:2.10")
 }

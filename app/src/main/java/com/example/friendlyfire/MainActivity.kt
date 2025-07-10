@@ -1,398 +1,300 @@
+// Fichier: app/src/main/java/com/example/friendlyfire/MainActivity.kt
+
 package com.example.friendlyfire
 
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import android.view.View
-import android.view.ViewGroup
 import android.widget.*
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.example.friendlyfire.models.Player
-import com.example.friendlyfire.models.Question
-import java.io.File
-import kotlin.random.Random
+import com.example.friendlyfire.ui.main.GamePhase
+import com.example.friendlyfire.ui.main.MainViewModel
+import com.example.friendlyfire.ui.main.CoinResult
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 
+@AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
-    private val players = mutableListOf<Player>() // Liste des joueurs
-    private var currentTurn = 0 // Tour actuel
-    private var totalTurns = 2 // Nombre total de tours
-    private lateinit var currentPlayer: Player // Joueur actuel
-    private lateinit var currentQuestion: Question // Question actuelle
+    private val viewModel: MainViewModel by viewModels()
+
+    // Views
     private lateinit var turnTextView: TextView
+    private lateinit var turnCounterTextView: TextView
     private lateinit var showQuestionButton: Button
     private lateinit var questionTextView: TextView
     private lateinit var playersLayout: LinearLayout
     private lateinit var validateButton: Button
-    private lateinit var statsTextView: TextView // TextView pour afficher les statistiques
-    private lateinit var turnCounterTextView: TextView
+    private lateinit var statsTextView: TextView
     private lateinit var quitButton: Button
+    private lateinit var mainLayout: LinearLayout
+    private lateinit var replayButton: Button
 
-
-
-    private val availableQuestions = mutableListOf<Question>() // Liste des questions disponibles
-
-
-
+    private var selectedCheckBox: CheckBox? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        totalTurns = intent.getIntExtra("TOTAL_TURNS", 10) // 10 est la valeur par défaut si rien n'est passé
+        initializeViews()
+        setupClickListeners()
+        observeViewModel()
 
-        loadQuestions()
+        // Initialiser le jeu avec le nombre de tours
+        val totalTurns = intent.getIntExtra("TOTAL_TURNS", 10)
+        viewModel.initializeGame(totalTurns)
+    }
 
+    private fun initializeViews() {
         turnTextView = findViewById(R.id.turnTextView)
+        turnCounterTextView = findViewById(R.id.turnCounterTextView)
         showQuestionButton = findViewById(R.id.showQuestionButton)
         questionTextView = findViewById(R.id.questionTextView)
         playersLayout = findViewById(R.id.playersLayout)
         validateButton = findViewById(R.id.validateButton)
-        turnCounterTextView = findViewById(R.id.turnCounterTextView)
-        statsTextView = findViewById(R.id.statsTextView) // Initialisation de la TextView pour les stats
+        statsTextView = findViewById(R.id.statsTextView)
+        quitButton = findViewById(R.id.quitButton)
+        mainLayout = findViewById(R.id.mainLayout)
+        replayButton = findViewById(R.id.replayButton)
+    }
 
+    private fun setupClickListeners() {
+        showQuestionButton.setOnClickListener {
+            viewModel.showQuestion()
+        }
 
-        turnCounterTextView.text = "Tour ${currentTurn + 1}/$totalTurns"
-
-        quitButton = findViewById(R.id.quitButton)  // Assure-toi que ce bouton est bien dans ton layout
-        quitButton.visibility = View.VISIBLE
-
+        validateButton.setOnClickListener {
+            viewModel.validatePlayerSelection()
+        }
 
         quitButton.setOnClickListener {
             showQuitDialog()
         }
 
-        // Récupérer la liste des joueurs depuis le fichier
-        players.clear()
-        players.addAll(loadPlayers())
+        replayButton.setOnClickListener {
+            viewModel.resetGame()
+        }
+    }
 
-        // Vérifier si des joueurs existent
-        if (players.isEmpty()) {
-            turnTextView.text = "Aucun joueur enregistré. Veuillez ajouter des joueurs."
-            showQuestionButton.visibility = View.GONE
+    private fun observeViewModel() {
+        lifecycleScope.launch {
+            viewModel.viewState.collect { state ->
+                updateUI(state)
+            }
+        }
+    }
+
+    private fun updateUI(state: com.example.friendlyfire.ui.main.MainViewState) {
+        // Gestion du loading
+        if (state.isLoading) {
+            showLoadingState()
             return
         }
 
-        // Initialiser les pénalités pour chaque joueur
-
-
-        // Choisir un joueur au hasard pour commencer
-        currentPlayer = players.random()
-        turnTextView.text = "${currentPlayer.name} commence !"
-
-        // Configurer l'interface pour commencer
-        questionTextView.visibility = View.INVISIBLE
-        playersLayout.visibility = View.INVISIBLE
-        validateButton.visibility = View.INVISIBLE
-
-        // Bouton "Afficher la question"
-        showQuestionButton.setOnClickListener {
-            showQuestionButton.visibility = View.INVISIBLE // Cacher le bouton
-
-            val question = generateRandomQuestion(currentPlayer)
-            if (question == null) {
-                Toast.makeText(this, "Toutes les questions ont été utilisées !", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            currentQuestion = question
-            questionTextView.text = "${currentQuestion.questionText} (Pénalité: ${currentQuestion.penalties})"
-            questionTextView.visibility = View.VISIBLE
-
-            showPlayersForSelection(playersLayout)
-            validateButton.visibility = View.VISIBLE
+        // Gestion des erreurs
+        state.error?.let { error ->
+            showErrorState(error)
+            return
         }
 
+        // Mise à jour des textes
+        turnTextView.text = viewModel.getPlayerTurnText()
+        turnCounterTextView.text = viewModel.getCurrentTurnText()
 
-        // Bouton "Valider"
-        validateButton.setOnClickListener {
-            val selectedPlayer = getSelectedPlayer(playersLayout)
-            if (selectedPlayer != null) {
-                Toast.makeText(this, "Question attribuée à ${selectedPlayer.name} !", Toast.LENGTH_SHORT).show()
-
-                // Ajouter la question à la liste des questions du joueur sélectionné
-                selectedPlayer.questions.add(currentQuestion)
-
-                showQuestionButton.visibility = View.GONE
-
-
-                // Le joueur sélectionné devient celui qui joue ensuite
-                currentPlayer = selectedPlayer
-
-                // Masquer les éléments de l'interface et préparer le pile ou face
-                questionTextView.visibility = View.INVISIBLE
-                playersLayout.visibility = View.INVISIBLE
-                validateButton.visibility = View.INVISIBLE
-
-                // Afficher l'étape de pile ou face
-                showTossCoinPhase()
-            } else {
-                Toast.makeText(this, "Veuillez sélectionner un joueur !", Toast.LENGTH_SHORT).show()
-            }
+        // Gestion des phases de jeu
+        when (state.gamePhase) {
+            GamePhase.SETUP -> showSetupPhase()
+            GamePhase.WAITING_QUESTION -> showWaitingQuestionPhase()
+            GamePhase.QUESTION_SHOWN -> showQuestionShownPhase(state)
+            GamePhase.COIN_TOSS -> showCoinTossPhase(state)
+            GamePhase.GAME_OVER -> showGameOverPhase(state)
         }
-
-
     }
 
-    // Charger les joueurs depuis un fichier texte
-    private fun loadPlayers(): List<Player> {
-        val playersList = mutableListOf<Player>()
-        val file = File(filesDir, "players.txt")
-        if (file.exists()) {
-            file.forEachLine { line ->
-                playersList.add(Player(line))  // Créer un objet Player pour chaque nom
-            }
-        }
-        return playersList
+    private fun showLoadingState() {
+        turnTextView.text = "Chargement..."
+        showQuestionButton.visibility = View.GONE
+        questionTextView.visibility = View.GONE
+        playersLayout.visibility = View.GONE
+        validateButton.visibility = View.GONE
+        mainLayout.removeAllViews()
     }
 
-    // Charger les questions depuis un fichier texte
-    private fun loadQuestions() {
-        val questionsList = mutableListOf<Question>()
-        val file = File(filesDir, "questions.txt")
-        if (file.exists()) {
-            file.forEachLine { line ->
-                val parts = line.split("|")
-                if (parts.size == 2) {
-                    val questionText = parts[0]
-                    val penalties = parts[1].toIntOrNull() ?: 0
-                    questionsList.add(Question(questionText, penalties))
-                }
-            }
-        }
-        availableQuestions.clear()
-        availableQuestions.addAll(questionsList)
+    private fun showErrorState(error: String) {
+        turnTextView.text = error
+        showQuestionButton.visibility = View.GONE
+        questionTextView.visibility = View.GONE
+        playersLayout.visibility = View.GONE
+        validateButton.visibility = View.GONE
+        mainLayout.removeAllViews()
 
-    }
-
-
-
-
-    // Générer une question aléatoire à partir des questions enregistrées
-    private fun generateRandomQuestion(player: Player): Question {
-        if (availableQuestions.isEmpty()) {
-            // Si plus de questions disponibles
-            Toast.makeText(this, "Aucune question disponible !", Toast.LENGTH_SHORT).show()
-            return Question("Fin des questions", 0)
-        }
-        val randomQuestion = availableQuestions.random()
-        availableQuestions.remove(randomQuestion)
-        return randomQuestion.copy(player = player)
-
-    }
-
-
-
-
-
-    private fun showPlayersForSelection(layout: LinearLayout) {
-        layout.removeAllViews() // Réinitialiser les vues
-
-        var selectedCheckBox: CheckBox? = null // Stocke la case actuellement sélectionnée
-
-        players.forEach { player ->
-            val checkBox = CheckBox(this).apply {
-                text = player.name
-                id = View.generateViewId()
-
-                // Initialiser la couleur de fond
-                setBackgroundColor(resources.getColor(android.R.color.transparent))
-
-                // Gestion de la sélection exclusive
+        if (error.contains("joueur")) {
+            // Ajouter un bouton pour aller à la gestion des joueurs
+            val goToPlayersButton = Button(this).apply {
+                text = "Gérer les joueurs"
                 setOnClickListener {
-                    // Si cette case est déjà sélectionnée, la désélectionner
-                    if (selectedCheckBox == this) {
-                        isChecked = false
-                        setBackgroundColor(resources.getColor(android.R.color.transparent))
-                        selectedCheckBox = null
-                    } else {
-                        // Sinon, désélectionner l'ancienne case et sélectionner celle-ci
-                        selectedCheckBox?.apply {
-                            isChecked = false
-                            setBackgroundColor(resources.getColor(android.R.color.transparent))
-                        }
-                        isChecked = true
-                        setBackgroundColor(resources.getColor(android.R.color.darker_gray))
-                        selectedCheckBox = this
-                    }
+                    finish() // Retourner à l'activité précédente
                 }
             }
-
-            // Ajouter la CheckBox au layout
-            layout.addView(checkBox)
+            mainLayout.addView(goToPlayersButton)
         }
-
-        layout.visibility = View.VISIBLE
     }
 
-    private fun getSelectedPlayer(layout: LinearLayout): Player? {
-        // Récupérer la CheckBox sélectionnée
-        for (i in 0 until layout.childCount) {
-            val view = layout.getChildAt(i)
-            if (view is CheckBox && view.isChecked) {
-                return players.find { it.name == view.text.toString() }
-            }
-        }
-        return null
+    private fun showSetupPhase() {
+        showQuestionButton.visibility = View.GONE
+        questionTextView.visibility = View.GONE
+        playersLayout.visibility = View.GONE
+        validateButton.visibility = View.GONE
+        mainLayout.removeAllViews()
     }
 
-
-
-
-    private fun showStats() {
-        // Afficher le bouton "Rejouer"
-        val replayButton: Button = findViewById(R.id.replayButton)
-        replayButton.visibility = View.VISIBLE
-
-        // Associer le bouton "Rejouer" à la réinitialisation du jeu
-        replayButton.setOnClickListener {
-            resetGame()
-        }
-
-        // Construire les statistiques
-        val stats = StringBuilder("Stats de la partie:\n")
-        players.forEach { player ->
-            stats.append("${player.name}:\n")
-
-            if (player.questions.isNotEmpty()) {
-                player.questions.forEach { question ->
-                    val playerWhoAssigned = question.player?.name ?: "Joueur inconnu"
-                    stats.append("- Question: ${question.questionText} (Pénalité: ${question.penalties}), Attribuée par: $playerWhoAssigned\n")
-                }
-            } else {
-                stats.append("- Aucune question attribuée.\n")
-            }
-
-            stats.append("Total des pénalités: ${player.totalPenalties()}\n\n")
-        }
-
-        // Afficher les statistiques
-        val statsTextView: TextView = findViewById(R.id.statsTextView)
-        statsTextView.text = stats.toString()
-        statsTextView.visibility = View.VISIBLE
+    private fun showWaitingQuestionPhase() {
+        showQuestionButton.visibility = View.VISIBLE
+        questionTextView.visibility = View.GONE
+        playersLayout.visibility = View.GONE
+        validateButton.visibility = View.GONE
+        mainLayout.removeAllViews()
+        replayButton.visibility = View.GONE
+        statsTextView.visibility = View.GONE
     }
 
+    private fun showQuestionShownPhase(state: com.example.friendlyfire.ui.main.MainViewState) {
+        showQuestionButton.visibility = View.GONE
+        questionTextView.text = viewModel.getQuestionText()
+        questionTextView.visibility = View.VISIBLE
 
+        setupPlayerSelection(state.players)
+        playersLayout.visibility = View.VISIBLE
+        validateButton.visibility = View.VISIBLE
+        mainLayout.removeAllViews()
+    }
 
-
-
-    private fun endGame() {
-        // Masquer les éléments du jeu
+    private fun showCoinTossPhase(state: com.example.friendlyfire.ui.main.MainViewState) {
         showQuestionButton.visibility = View.GONE
         questionTextView.visibility = View.GONE
         playersLayout.visibility = View.GONE
         validateButton.visibility = View.GONE
 
-        findViewById<LinearLayout>(R.id.mainLayout).removeAllViews()
+        mainLayout.removeAllViews()
 
-        turnTextView.text = "Fin de partie ! Merci d'avoir joué !"
-        showStats()
-    }
-
-
-    private fun proceedToNextTurn() {
-        currentTurn++
-        if (currentTurn >= totalTurns) {
-            endGame()
-        } else {
-
-            turnCounterTextView.text = "Tour ${currentTurn + 1}/$totalTurns"
-            showQuestionButton.visibility = View.VISIBLE
-
-
-            turnTextView.text = "C'est à ${currentPlayer.name} de jouer !"
-            questionTextView.visibility = View.INVISIBLE
-            playersLayout.visibility = View.INVISIBLE
-            validateButton.visibility = View.INVISIBLE
-            findViewById<LinearLayout>(R.id.mainLayout).removeAllViews() // Nettoyer les boutons
-            showQuestionButton.visibility = View.VISIBLE // Réactiver le bouton pour afficher une question
-        }
-    }
-
-
-    private fun showTossCoinPhase() {
-        turnTextView.text = "${currentPlayer.name}, lancez la pièce !"
-
-        // Bouton pour lancer la pièce
-        val tossCoinButton = Button(this).apply {
-            text = "Lancer la pièce"
-            setOnClickListener {
-                val result = if (Random.nextBoolean()) "face" else "pile"
-                handleTossCoinResult(result)
+        if (state.coinResult == null) {
+            // Afficher le texte pour le joueur qui va lancer la pièce
+            val selectedPlayer = state.selectedPlayer?.name ?: "Joueur"
+            val instructionText = TextView(this).apply {
+                text = "$selectedPlayer, lance la pièce !"
+                textSize = 18f
+                setPadding(16, 16, 16, 16)
+                gravity = android.view.Gravity.CENTER
             }
-        }
+            mainLayout.addView(instructionText)
 
-        // Ajouter le bouton dynamiquement
-        findViewById<LinearLayout>(R.id.mainLayout).apply {
-            removeAllViews() // Supprimer les anciens boutons
-            addView(tossCoinButton)
-        }
-    }
-
-    private fun handleTossCoinResult(result: String) {
-        // Supprimer le bouton de la pièce
-        findViewById<LinearLayout>(R.id.mainLayout).removeAllViews()
-
-        if (result == "face") {
-            turnTextView.text = "Face ! Voici la question : ${currentQuestion.questionText}"
-            val nextButton = Button(this).apply {
-                text = "Tour suivant"
+            // Afficher le bouton pour lancer la pièce
+            val tossCoinButton = Button(this).apply {
+                text = "Lancer la pièce"
                 setOnClickListener {
-                    proceedToNextTurn()
+                    viewModel.tossCoin()
                 }
             }
-            findViewById<LinearLayout>(R.id.mainLayout).addView(nextButton)
+            mainLayout.addView(tossCoinButton)
         } else {
-            turnTextView.text = "Pile ! ${currentPlayer.name} doit prendre ${currentQuestion.penalties} pénalités."
-            currentPlayer.penalties += currentQuestion.penalties
-            val nextButton = Button(this).apply {
+            // Afficher le résultat
+            val resultText = TextView(this).apply {
+                text = viewModel.getCoinResultText()
+                textSize = 16f
+                setPadding(16, 16, 16, 16)
+                gravity = android.view.Gravity.CENTER
+            }
+            mainLayout.addView(resultText)
+
+            val nextTurnButton = Button(this).apply {
                 text = "Tour suivant"
                 setOnClickListener {
-                    proceedToNextTurn()
+                    viewModel.nextTurn()
                 }
             }
-            findViewById<LinearLayout>(R.id.mainLayout).addView(nextButton)
+            mainLayout.addView(nextTurnButton)
         }
-
     }
 
-    private fun resetGame() {
+    private fun showGameOverPhase(state: com.example.friendlyfire.ui.main.MainViewState) {
+        showQuestionButton.visibility = View.GONE
+        questionTextView.visibility = View.GONE
+        playersLayout.visibility = View.GONE
+        validateButton.visibility = View.GONE
+        mainLayout.removeAllViews()
+
+        // Afficher les statistiques
+        statsTextView.text = viewModel.getGameStatsText()
+        statsTextView.visibility = View.VISIBLE
+
+        // Afficher le bouton rejouer
+        replayButton.visibility = View.VISIBLE
+    }
+
+    private fun setupPlayerSelection(players: List<Player>) {
+        playersLayout.removeAllViews()
+        selectedCheckBox = null
+
         players.forEach { player ->
-            player.penalties = 0
-            player.questions.clear()
+            val checkBox = CheckBox(this).apply {
+                text = player.name
+                id = View.generateViewId()
+                setBackgroundColor(resources.getColor(android.R.color.transparent))
 
+                setOnClickListener {
+                    handlePlayerSelection(this, player)
+                }
+            }
+            playersLayout.addView(checkBox)
         }
-        loadQuestions()
-        currentTurn = 0
-        val intent = intent
-        finish()
-        startActivity(intent)
     }
 
+    private fun handlePlayerSelection(checkBox: CheckBox, player: Player) {
+        if (selectedCheckBox == checkBox) {
+            // Désélectionner
+            checkBox.isChecked = false
+            checkBox.setBackgroundColor(resources.getColor(android.R.color.transparent))
+            selectedCheckBox = null
+            viewModel.selectPlayer(null as Player?)
+        } else {
+            // Désélectionner l'ancien
+            selectedCheckBox?.apply {
+                isChecked = false
+                setBackgroundColor(resources.getColor(android.R.color.transparent))
+            }
 
+            // Sélectionner le nouveau
+            checkBox.isChecked = true
+            checkBox.setBackgroundColor(resources.getColor(android.R.color.darker_gray))
+            selectedCheckBox = checkBox
+            viewModel.selectPlayer(player)
+        }
+    }
 
     private fun showQuitDialog() {
-        val builder = AlertDialog.Builder(this)
-        builder.setMessage("Voulez-vous quitter le jeu ?")
+        AlertDialog.Builder(this)
+            .setMessage("Voulez-vous quitter le jeu ?")
             .setCancelable(false)
             .setPositiveButton("Oui") { _, _ ->
-                // Code pour retourner à l'écran d'accueil
-                val intent = Intent(this, WelcomeActivity::class.java)  // Remplace AccueilActivity par ton activité d'accueil
+                val intent = Intent(this, WelcomeActivity::class.java)
                 startActivity(intent)
-                finish()  // Fin de l'activité actuelle pour revenir à l'accueil
+                finish()
             }
             .setNegativeButton("Non") { dialog, _ ->
-                dialog.dismiss()  // Ferme le dialog sans rien faire
+                dialog.dismiss()
             }
-
-        val dialog = builder.create()
-        dialog.show()
+            .create()
+            .show()
     }
 
-
+    @Suppress("DEPRECATION")
     override fun onBackPressed() {
-        showQuitDialog()  // Affiche le dialog de confirmation si le bouton retour est pressé
+        showQuitDialog()
     }
+
 
 }
