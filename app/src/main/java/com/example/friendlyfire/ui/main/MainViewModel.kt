@@ -25,7 +25,7 @@ class MainViewModel @Inject constructor(
 
     private val _availableQuestions = mutableListOf<Question>()
 
-    fun initializeGame(totalTurns: Int) {
+    fun initializeGame(totalTurns: Int, gameId: String = "friendly_fire") {
         _viewState.update { it.copy(isLoading = true, totalTurns = totalTurns) }
 
         viewModelScope.launch {
@@ -33,11 +33,13 @@ class MainViewModel @Inject constructor(
                 // Assurer que les questions sont chargées
                 gameUseCase.ensureQuestionsLoaded()
 
-                // Charger les données du jeu
-                gameUseCase.getGameData().collect { (players, questions) ->
-                    _availableQuestions.clear()
-                    _availableQuestions.addAll(questions)
+                // Charger les questions avec priorité
+                val prioritizedQuestions = gameUseCase.getQuestionsWithPriority(gameId, totalTurns)
+                _availableQuestions.clear()
+                _availableQuestions.addAll(prioritizedQuestions)
 
+                // Charger les joueurs
+                gameUseCase.getGameData().collect { (players, _) ->
                     when {
                         players.isEmpty() -> {
                             _viewState.update {
@@ -47,7 +49,7 @@ class MainViewModel @Inject constructor(
                                 )
                             }
                         }
-                        questions.isEmpty() -> {
+                        prioritizedQuestions.isEmpty() -> {
                             _viewState.update {
                                 it.copy(
                                     isLoading = false,
@@ -62,7 +64,7 @@ class MainViewModel @Inject constructor(
                                 it.copy(
                                     isLoading = false,
                                     players = players,
-                                    availableQuestions = questions,
+                                    availableQuestions = prioritizedQuestions,
                                     currentPlayer = startingPlayer,
                                     gamePhase = GamePhase.WAITING_QUESTION,
                                     error = null

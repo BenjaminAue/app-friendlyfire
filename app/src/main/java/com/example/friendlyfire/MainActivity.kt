@@ -44,9 +44,13 @@ class MainActivity : AppCompatActivity() {
         setupClickListeners()
         observeViewModel()
 
-        // Initialiser le jeu avec le nombre de tours
+        // Récupérer les paramètres du jeu
         val totalTurns = intent.getIntExtra("TOTAL_TURNS", 10)
-        viewModel.initializeGame(totalTurns)
+        val gameId = intent.getStringExtra("GAME_ID") ?: "friendly_fire"
+        val questionTheme = intent.getStringExtra("QUESTION_THEME") ?: "RANDOM"
+
+        // Initialiser le jeu avec les paramètres
+        viewModel.initializeGame(totalTurns, gameId)
     }
 
     private fun initializeViews() {

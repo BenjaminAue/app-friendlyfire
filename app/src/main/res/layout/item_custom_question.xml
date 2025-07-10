@@ -2,33 +2,97 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:padding="16dp"
-    android:background="@color/purple_200"
-    android:layout_marginBottom="8dp">
+    android:orientation="vertical"
+    android:background="@drawable/custom_question_card"
+    android:layout_marginBottom="12dp"
+    android:elevation="4dp">
 
-    <TextView
-        android:id="@+id/questionTextView"
-        android:layout_width="0dp"
+    <!-- Contenu principal -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:text="Question"
-        android:textSize="16sp"
-        android:textColor="@color/white" />
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical">
 
-    <TextView
-        android:id="@+id/penaltyTextView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="3 pts"
-        android:textSize="14sp"
-        android:textColor="@color/white"
-        android:layout_marginEnd="8dp" />
+        <!-- Icône et question -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
 
-    <Button
-        android:id="@+id/deleteButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="🗑️" />
+            <TextView
+                android:id="@+id/questionTextView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Question personnalisée"
+                android:textSize="16sp"
+                android:textColor="@color/white"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⚡"
+                    android:textSize="14sp"
+                    android:layout_marginEnd="4dp" />
+
+                <TextView
+                    android:id="@+id/penaltyTextView"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="3 pénalités"
+                    android:textSize="14sp"
+                    android:textColor="@color/white"
+                    android:background="@drawable/penalty_badge"
+                    android:padding="6dp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Boutons d'action -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <Button
+                android:id="@+id/editButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="✏️"
+                android:textSize="14sp"
+                android:backgroundTint="@color/teal_200"
+                android:textColor="@color/white"
+                android:layout_marginBottom="8dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="8dp" />
+
+            <Button
+                android:id="@+id/deleteButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🗑️"
+                android:textSize="14sp"
+                android:backgroundTint="@color/purple_200"
+                android:textColor="@color/white"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="8dp" />
+
+        </LinearLayout>
+
+    </LinearLayout>
 
 </LinearLayout>

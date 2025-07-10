@@ -92,6 +92,9 @@ class GameConfigActivity : AppCompatActivity() {
         }
     }
 
+    // ===== 4. Mise à jour GameConfigActivity =====
+// Modification dans setupClickListeners()
+
     private fun setupClickListeners() {
         startGameButton.setOnClickListener {
             val state = viewModel.viewState.value
@@ -102,11 +105,16 @@ class GameConfigActivity : AppCompatActivity() {
             finish()
         }
 
-        // Temporairement, on utilise l'ancienne ManageQuestionsActivity
+        // Bouton pour les questions personnalisées avec passage des paramètres
         val addCustomQuestionsButton = findViewById<Button>(R.id.addCustomQuestionsButton)
         addCustomQuestionsButton.setOnClickListener {
-            val intent = Intent(this, ManageQuestionsActivity::class.java)
-            startActivity(intent)
+            val gameInfo = viewModel.viewState.value.gameInfo
+            if (gameInfo != null) {
+                val intent = Intent(this, ManageQuestionsActivity::class.java)
+                intent.putExtra("GAME_ID", gameInfo.id)
+                intent.putExtra("GAME_NAME", gameInfo.name)
+                startActivity(intent)
+            }
         }
     }
 
@@ -136,6 +144,7 @@ class GameConfigActivity : AppCompatActivity() {
             "friendly_fire" -> {
                 val intent = Intent(this, MainActivity::class.java)
                 intent.putExtra("TOTAL_TURNS", state.selectedTurns)
+                intent.putExtra("GAME_ID", gameInfo.id)
                 intent.putExtra("QUESTION_THEME", state.selectedTheme.name)
                 startActivity(intent)
             }

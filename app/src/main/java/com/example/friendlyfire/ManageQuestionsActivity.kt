@@ -1,197 +1,222 @@
+// ===== 1. Mise à jour de ManageQuestionsActivity =====
+// Modification complète pour afficher seulement les questions custom
+
 package com.example.friendlyfire
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import android.widget.*
+import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.example.friendlyfire.adapters.CustomQuestionAdapter
 import com.example.friendlyfire.models.Question
-import java.io.BufferedReader
-import java.io.File
-import java.io.FileNotFoundException
-import java.io.InputStreamReader
-import java.io.PrintWriter
+import com.example.friendlyfire.ui.questions.CustomQuestionsViewModel
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 
+@AndroidEntryPoint
 class ManageQuestionsActivity : AppCompatActivity() {
 
-    private val questionsList = mutableListOf<Question>()
-    private lateinit var questionsListView: ListView
+    private val viewModel: CustomQuestionsViewModel by viewModels()
+
+    private lateinit var questionsRecyclerView: RecyclerView
     private lateinit var addQuestionButton: Button
-    private lateinit var questionsAdapter: ArrayAdapter<String>
+    private lateinit var questionsCountTextView: TextView
+    private lateinit var backButton: Button
+    private lateinit var gameNameTextView: TextView
+    private lateinit var customQuestionAdapter: CustomQuestionAdapter
+
+    private var gameId: String = "friendly_fire"
+    private var gameName: String = "Friendly Fire"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_manage_questions)
 
-        questionsListView = findViewById(R.id.questionRecyclerView)
+        // Récupérer les infos du jeu depuis l'intent (si appelé depuis GameConfig)
+        gameId = intent.getStringExtra("GAME_ID") ?: "friendly_fire"
+        gameName = intent.getStringExtra("GAME_NAME") ?: "Friendly Fire"
+
+        initializeViews()
+        setupRecyclerView()
+        setupClickListeners()
+        observeViewModel()
+
+        // Initialiser pour ce jeu spécifique
+        viewModel.initializeForGame(gameId)
+    }
+
+    private fun initializeViews() {
+        // S'assurer que tous ces IDs existent dans le layout
+        questionsRecyclerView = findViewById(R.id.questionRecyclerView) // ← Vérifiez cet ID
         addQuestionButton = findViewById(R.id.addQuestionButton)
+        questionsCountTextView = findViewById(R.id.questionsCountTextView)
+        backButton = findViewById(R.id.backButton)
+        gameNameTextView = findViewById(R.id.gameNameTextView)
 
-        // Initialiser l'adaptateur avant d'appeler loadQuestions()
-        questionsListView = findViewById(R.id.questionRecyclerView)
-        questionsAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, questionsList.map { it.questionText })
-        questionsListView.adapter = questionsAdapter
+        // Personnaliser l'interface pour le jeu
+        gameNameTextView.text = "Questions pour $gameName"
+        addQuestionButton.text = "➕ Ajouter une question personnalisée"
+    }
 
-        // Charger les questions enregistrées depuis un fichier texte
-        loadQuestions()
-        saveQuestionsToExternal()
-        importQuestionsFromRaw()
-        //clearQuestionsFile()
+    private fun setupRecyclerView() {
+        customQuestionAdapter = CustomQuestionAdapter(
+            questions = emptyList(),
+            onDeleteClick = { question -> showDeleteConfirmation(question) },
+            onEditClick = { question -> showEditQuestionDialog(question) }
+        )
+        questionsRecyclerView.adapter = customQuestionAdapter
+        questionsRecyclerView.layoutManager = LinearLayoutManager(this)
+    }
 
-        // Bouton pour ajouter une question
-        addQuestionButton.setOnClickListener { showAddQuestionDialog() }
+    private fun setupClickListeners() {
+        addQuestionButton.setOnClickListener {
+            showAddQuestionDialog()
+        }
 
-        // Suppression d'une question en appuyant longtemps sur un élément
-        questionsListView.setOnItemLongClickListener { _, _, position, _ ->
-            val selectedQuestion = questionsList[position]
-            showDeleteQuestionDialog(selectedQuestion, position)
-            true
+        backButton.setOnClickListener {
+            // Retourner vers GameConfigActivity avec les bons paramètres
+            val intent = Intent(this, GameConfigActivity::class.java)
+            intent.putExtra("GAME_INFO", createGameInfoFromId(gameId, gameName))
+            intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            startActivity(intent)
+            finish()
         }
     }
 
-    // Affiche un pop-up pour ajouter une nouvelle question
+    // Méthode helper pour créer GameInfo
+    private fun createGameInfoFromId(gameId: String, gameName: String): com.example.friendlyfire.ui.home.GameInfo {
+        return com.example.friendlyfire.ui.home.GameInfo(
+            id = gameId,
+            name = gameName,
+            description = "Jeu de questions entre amis",
+            minPlayers = 2,
+            maxPlayers = 10,
+            isAvailable = true
+        )
+    }
+
+    private fun observeViewModel() {
+        lifecycleScope.launch {
+            viewModel.viewState.collect { state ->
+                updateUI(state)
+            }
+        }
+    }
+
     private fun showAddQuestionDialog() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_add_question, null)
+        val questionEditText = dialogView.findViewById<EditText>(R.id.questionEditText)
+        val penaltySpinner = dialogView.findViewById<Spinner>(R.id.penaltySpinner)
 
-        val editTextQuestion = dialogView.findViewById<EditText>(R.id.editTextQuestion)
-        val spinnerPenaltyPoints = dialogView.findViewById<Spinner>(R.id.spinnerPenaltyPoints)
+        // Configurer le spinner
+        setupPenaltySpinner(penaltySpinner)
 
-        // Configurer le Spinner
-        val penaltyOptions = (1..10).toList()
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, penaltyOptions)
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        spinnerPenaltyPoints.adapter = adapter
+        // Placeholder spécifique au jeu
+        questionEditText.hint = when (gameId) {
+            "friendly_fire" -> "Ex: Qui a le plus de chance de devenir célèbre ?"
+            else -> "Entrez votre question..."
+        }
 
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("Ajouter une question")
+        AlertDialog.Builder(this)
+            .setTitle("✨ Nouvelle question pour $gameName")
             .setView(dialogView)
             .setPositiveButton("Ajouter") { _, _ ->
-                val questionText = editTextQuestion.text.toString()
-                val penaltyPoints = spinnerPenaltyPoints.selectedItem as Int
+                val questionText = questionEditText.text.toString().trim()
+                val penalties = (penaltySpinner.selectedItem as Int)
 
                 if (questionText.isNotEmpty()) {
-                    val newQuestion = Question(questionText, penaltyPoints)
-                    questionsList.add(newQuestion)
-                    questionsAdapter.clear()
-                    questionsAdapter.addAll(questionsList.map { it.questionText })
-                    questionsAdapter.notifyDataSetChanged()
-                    saveQuestions()
+                    // Le ViewModel va automatiquement recharger la liste
+                    viewModel.addQuestionForGame(gameId, questionText, penalties)
+                    Toast.makeText(this, "Question ajoutée !", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(this, "Veuillez entrer une question", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Annuler", null)
             .create()
-
-        dialog.show()
+            .show()
     }
 
-    // Affiche un pop-up pour confirmer la suppression d'une question
-    private fun showDeleteQuestionDialog(question: Question, position: Int) {
+    private fun updateUI(state: com.example.friendlyfire.ui.questions.CustomQuestionsViewState) {
+        // Mettre à jour la liste - FORCER la mise à jour
+        customQuestionAdapter.updateQuestions(state.customQuestions)
+        customQuestionAdapter.notifyDataSetChanged() // Forcer le rafraîchissement
+
+        // Mettre à jour le compteur
+        val count = state.customQuestions.size
+        questionsCountTextView.text = when (count) {
+            0 -> "🎯 Aucune question personnalisée"
+            1 -> "🎯 1 question personnalisée"
+            else -> "🎯 $count questions personnalisées"
+        }
+
+        // Gérer les erreurs
+        state.error?.let { error ->
+            Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
+            viewModel.clearError()
+        }
+    }
+
+    private fun showEditQuestionDialog(question: Question) {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_add_question, null)
+        val questionEditText = dialogView.findViewById<EditText>(R.id.questionEditText)
+        val penaltySpinner = dialogView.findViewById<Spinner>(R.id.penaltySpinner)
+
+        // Pré-remplir avec les valeurs actuelles
+        questionEditText.setText(question.questionText)
+        setupPenaltySpinner(penaltySpinner)
+
+        // Sélectionner la pénalité actuelle
+        val penaltyPosition = (question.penalties - 1).coerceIn(0, 9)
+        penaltySpinner.setSelection(penaltyPosition)
+
         AlertDialog.Builder(this)
-            .setTitle("Supprimer une question")
-            .setMessage("Voulez-vous supprimer cette question ?\n\n${question.questionText}")
-            .setPositiveButton("Supprimer") { _, _ ->
-                questionsList.removeAt(position)
-                saveQuestions()
-                refreshQuestionsList()
+            .setTitle("✏️ Modifier la question")
+            .setView(dialogView)
+            .setPositiveButton("Modifier") { _, _ ->
+                val questionText = questionEditText.text.toString().trim()
+                val penalties = (penaltySpinner.selectedItem as Int)
+
+                if (questionText.isNotEmpty()) {
+                    viewModel.updateQuestion(question, questionText, penalties)
+                } else {
+                    Toast.makeText(this, "Veuillez entrer une question", Toast.LENGTH_SHORT).show()
+                }
             }
             .setNegativeButton("Annuler", null)
             .create()
             .show()
     }
 
-    // Met à jour l'affichage des questions
-    private fun refreshQuestionsList() {
-        questionsAdapter.clear()
-        questionsAdapter.addAll(questionsList.map { it.questionText })
-        questionsAdapter.notifyDataSetChanged()
-    }
-
-    private fun saveQuestions() {
-        val file = File(filesDir, "questions.txt")
-        PrintWriter(file).use { writer ->
-            questionsList.forEach { question ->
-                writer.println("${question.questionText}|${question.penalties}")
+    private fun showDeleteConfirmation(question: Question) {
+        AlertDialog.Builder(this)
+            .setTitle("🗑️ Supprimer la question")
+            .setMessage("Voulez-vous vraiment supprimer cette question ?\n\n\"${question.questionText}\"")
+            .setPositiveButton("Supprimer") { _, _ ->
+                viewModel.deleteQuestion(question)
             }
-        }
-    }
-    private fun saveQuestionsToExternal() {
-        val file = File(getExternalFilesDir(null), "questions.txt")
-        PrintWriter(file).use { writer ->
-            questionsList.forEach { question ->
-                writer.println("${question.questionText}|${question.penalties}")
-            }
-        }
+            .setNegativeButton("Annuler", null)
+            .create()
+            .show()
     }
 
-
-    // Charger les questions depuis le fichier texte
-    private fun loadQuestions() {
-        val file = File(filesDir, "questions.txt")
-        if (file.exists()) {
-            try {
-                val bufferedReader = file.bufferedReader()
-                bufferedReader.forEachLine { line ->
-                    // Ignore les lignes vides
-                    if (line.isNotBlank()) {
-                        // Diviser la ligne par le séparateur '|'
-                        val parts = line.split("|")
-                        if (parts.size == 2) {
-                            val questionText = parts[0].trim()
-                            val penalties = parts[1].toIntOrNull() ?: 0
-                            // Ajouter la question à la liste
-                            questionsList.add(Question(questionText, penalties))
-                        }
-                    }
-                }
-                // Rafraîchir la liste des questions après le chargement
-                refreshQuestionsList()
-            } catch (e: FileNotFoundException) {
-                e.printStackTrace()
-            }
-        }
+    private fun setupPenaltySpinner(spinner: Spinner) {
+        val penalties = (1..10).toList()
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, penalties)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinner.adapter = adapter
+        spinner.setSelection(2) // Par défaut 3 pénalités
     }
-
-
-    private fun importQuestionsFromRaw() {
-        try {
-            val inputStream = resources.openRawResource(R.raw.new_questions)
-            val reader = BufferedReader(InputStreamReader(inputStream))
-
-            val newQuestions = mutableListOf<Question>()
-
-            reader.forEachLine { line ->
-                if (line.isNotEmpty()) {
-                    // Séparer la ligne en deux parties : la question et les pénalités
-                    val parts = line.split("|")
-                    if (parts.size == 2) {
-                        val questionText = parts[0].trim()
-                        val penalties = parts[1].trim().toIntOrNull() ?: 0
-                        newQuestions.add(Question(questionText, penalties))
-                    } else {
-
-                    }
-                }
-            }
-            questionsList.addAll(newQuestions)
-            saveQuestions()
-            refreshQuestionsList()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+    override fun onResume() {
+        super.onResume()
+        // Rafraîchir les questions à chaque retour sur l'écran
+        viewModel.initializeForGame(gameId)
     }
-
-
-    private fun clearQuestionsFile() {
-        val file = File(filesDir, "questions.txt")
-        if (file.exists()) {
-            PrintWriter(file).use { writer ->
-                writer.print("") // Écrire une chaîne vide pour vider le fichier
-            }
-            Toast.makeText(this, "Le fichier questions.txt a été vidé.", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, "Le fichier questions.txt n'existe pas.", Toast.LENGTH_SHORT).show()
-        }
-    }
-
 }

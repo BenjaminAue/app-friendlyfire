@@ -1,3 +1,6 @@
+// ===== 3. Mise à jour du modèle Question =====
+// Fichier: app/src/main/java/com/example/friendlyfire/models/Questions.kt
+
 package com.example.friendlyfire.models
 
 data class Question(
@@ -5,6 +8,5 @@ data class Question(
     val penalties: Int,
     val player: Player? = null,
     var used: Boolean = false,
-    val isCustom: Boolean = false // Nouvelle propriété
-
+    val isCustom: Boolean = false
 )

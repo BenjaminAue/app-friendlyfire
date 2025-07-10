@@ -1,5 +1,3 @@
-// Fichier: app/src/main/java/com/example/friendlyfire/domain/usecase/GameUseCase.kt
-
 package com.example.friendlyfire.domain.usecase
 
 import com.example.friendlyfire.data.repository.PlayerRepository
@@ -24,6 +22,11 @@ class GameUseCase @Inject constructor(
         ) { players, questions ->
             Pair(players, questions)
         }
+    }
+
+    // Obtenir les questions avec priorité
+    suspend fun getQuestionsWithPriority(gameId: String, totalTurns: Int): List<Question> {
+        return questionRepository.getQuestionsForGameWithPriority(gameId, totalTurns)
     }
 
     fun getRandomQuestion(availableQuestions: List<Question>, currentPlayer: Player): Question? {

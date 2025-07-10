@@ -10,4 +10,9 @@ interface QuestionRepository {
     suspend fun updateQuestion(question: Question)
     suspend fun clearAllQuestions()
     suspend fun importQuestionsFromRaw(): Boolean
+    fun getCustomQuestionsForGame(gameId: String): Flow<List<Question>>
+    suspend fun addCustomQuestionForGame(gameId: String, question: Question)
+    suspend fun deleteCustomQuestionForGame(gameId: String, question: Question)
+    suspend fun updateCustomQuestion(gameId: String, oldQuestion: Question, newQuestionText: String, newPenalties: Int)
+    suspend fun getQuestionsForGameWithPriority(gameId: String, totalTurns: Int): List<Question>
 }

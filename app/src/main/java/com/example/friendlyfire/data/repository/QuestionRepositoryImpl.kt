@@ -1,3 +1,6 @@
+// ===== 2. Mise à jour QuestionRepositoryImpl.kt =====
+// Implémentation complète avec système de priorité
+
 package com.example.friendlyfire.data.repository
 
 import android.content.Context
@@ -15,6 +18,8 @@ class QuestionRepositoryImpl @Inject constructor(
 ) : QuestionRepository {
 
     private val questionsFile = File(context.filesDir, "questions.txt")
+
+    // ===== Méthodes existantes =====
 
     override fun getAllQuestions(): Flow<List<Question>> = flow {
         emit(loadQuestionsFromFile())
@@ -78,6 +83,60 @@ class QuestionRepositoryImpl @Inject constructor(
         }
     }
 
+    // ===== Nouvelles méthodes pour les questions custom =====
+
+    override fun getCustomQuestionsForGame(gameId: String): Flow<List<Question>> = flow {
+        emit(loadCustomQuestionsForGame(gameId))
+    }
+
+    override suspend fun addCustomQuestionForGame(gameId: String, question: Question) {
+        val currentQuestions = loadCustomQuestionsForGame(gameId).toMutableList()
+        currentQuestions.add(question.copy(isCustom = true))
+        saveCustomQuestionsForGame(gameId, currentQuestions)
+    }
+
+    override suspend fun deleteCustomQuestionForGame(gameId: String, question: Question) {
+        val currentQuestions = loadCustomQuestionsForGame(gameId).toMutableList()
+        currentQuestions.removeAll { it.questionText == question.questionText }
+        saveCustomQuestionsForGame(gameId, currentQuestions)
+    }
+
+    override suspend fun updateCustomQuestion(gameId: String, oldQuestion: Question, newQuestionText: String, newPenalties: Int) {
+        val currentQuestions = loadCustomQuestionsForGame(gameId).toMutableList()
+        val index = currentQuestions.indexOfFirst { it.questionText == oldQuestion.questionText }
+        if (index != -1) {
+            currentQuestions[index] = currentQuestions[index].copy(
+                questionText = newQuestionText,
+                penalties = newPenalties
+            )
+            saveCustomQuestionsForGame(gameId, currentQuestions)
+        }
+    }
+
+    // ===== SYSTÈME DE PRIORITÉ DES QUESTIONS =====
+    override suspend fun getQuestionsForGameWithPriority(gameId: String, totalTurns: Int): List<Question> {
+        val baseQuestions = loadQuestionsFromFile()
+        val customQuestions = loadCustomQuestionsForGame(gameId)
+
+        // Mélanger les questions avec priorité aux custom
+        val prioritizedQuestions = mutableListOf<Question>()
+
+        // 1. Ajouter TOUTES les questions custom en premier (garanties d'apparaître)
+        prioritizedQuestions.addAll(customQuestions.shuffled())
+
+        // 2. Compléter avec les questions de base si nécessaire
+        val remainingSlots = (totalTurns - customQuestions.size).coerceAtLeast(0)
+        if (remainingSlots > 0) {
+            val shuffledBaseQuestions = baseQuestions.shuffled()
+            prioritizedQuestions.addAll(shuffledBaseQuestions.take(remainingSlots))
+        }
+
+        // 3. Mélanger légèrement tout en gardant les custom en priorité
+        return prioritizedQuestions.shuffled()
+    }
+
+    // ===== Méthodes privées =====
+
     private fun loadQuestionsFromFile(): List<Question> {
         return try {
             if (!questionsFile.exists()) {
@@ -93,7 +152,7 @@ class QuestionRepositoryImpl @Inject constructor(
                         val questionText = parts[0].trim()
                         val penalties = parts[1].trim().toIntOrNull() ?: 0
                         if (questionText.isNotEmpty()) {
-                            Question(questionText, penalties)
+                            Question(questionText, penalties, isCustom = false)
                         } else null
                     } else null
                 }
@@ -105,6 +164,46 @@ class QuestionRepositoryImpl @Inject constructor(
     private fun saveQuestionsToFile(questions: List<Question>) {
         try {
             questionsFile.printWriter().use { writer ->
+                questions.forEach { question ->
+                    writer.println("${question.questionText}|${question.penalties}")
+                }
+            }
+        } catch (e: Exception) {
+            // Log error
+        }
+    }
+
+    private fun loadCustomQuestionsForGame(gameId: String): List<Question> {
+        val file = File(context.filesDir, "custom_questions_$gameId.txt")
+        return try {
+            if (!file.exists()) return emptyList()
+
+            file.readLines()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .mapNotNull { line ->
+                    val parts = line.split("|")
+                    if (parts.size == 2) {
+                        val questionText = parts[0].trim()
+                        val penalties = parts[1].trim().toIntOrNull() ?: 0
+                        if (questionText.isNotEmpty()) {
+                            Question(
+                                questionText = questionText,
+                                penalties = penalties,
+                                isCustom = true
+                            )
+                        } else null
+                    } else null
+                }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun saveCustomQuestionsForGame(gameId: String, questions: List<Question>) {
+        val file = File(context.filesDir, "custom_questions_$gameId.txt")
+        try {
+            file.printWriter().use { writer ->
                 questions.forEach { question ->
                     writer.println("${question.questionText}|${question.penalties}")
                 }

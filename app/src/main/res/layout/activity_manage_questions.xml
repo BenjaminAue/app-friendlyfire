@@ -3,20 +3,72 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="16dp"
+    android:background="@color/white">
 
-    <ListView
-        android:id="@+id/questionRecyclerView"
+    <!-- Header avec retour -->
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:divider="@android:color/darker_gray"
-        android:dividerHeight="1dp" />
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="16dp">
 
+        <Button
+            android:id="@+id/backButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="← Retour"
+            android:textSize="16sp"
+            android:backgroundTint="@color/purple_200"
+            android:textColor="@color/white"
+            android:layout_marginEnd="16dp" />
 
+        <TextView
+            android:id="@+id/gameNameTextView"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Questions Personnalisées"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:textColor="@color/purple_700" />
+
+    </LinearLayout>
+
+    <!-- Compteur -->
+    <TextView
+        android:id="@+id/questionsCountTextView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🎯 0 questions personnalisées"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="@color/white"
+        android:background="@color/teal_200"
+        android:padding="16dp"
+        android:gravity="center"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Bouton ajouter -->
     <Button
         android:id="@+id/addQuestionButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Ajouter une question" />
+        android:text="➕ Ajouter une question personnalisée"
+        android:backgroundTint="@color/purple_500"
+        android:textColor="@color/white"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="16dp"
+        android:padding="16dp" />
+
+    <!-- RecyclerView AVEC LE BON ID -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/questionRecyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
 </LinearLayout>
