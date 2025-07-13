@@ -1,3 +1,5 @@
+// Fichier: app/src/main/java/com/example/friendlyfire/ui/questions/CustomQuestionsViewModel.kt
+
 package com.example.friendlyfire.ui.questions
 
 import androidx.lifecycle.ViewModel
@@ -65,8 +67,7 @@ class CustomQuestionsViewModel @Inject constructor(
                     isCustom = true
                 )
                 questionRepository.addCustomQuestionForGame(gameId, question)
-                // Recharger immédiatement après ajout
-                loadCustomQuestionsForGame(gameId)
+                // Les données se mettront à jour automatiquement via le Flow
             } catch (e: Exception) {
                 _viewState.update { it.copy(error = "Erreur lors de l'ajout de la question") }
             }
@@ -77,10 +78,26 @@ class CustomQuestionsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 questionRepository.deleteCustomQuestionForGame(currentGameId, question)
-                // Recharger immédiatement après suppression
-                loadCustomQuestionsForGame(currentGameId)
+                // Les données se mettront à jour automatiquement via le Flow
             } catch (e: Exception) {
                 _viewState.update { it.copy(error = "Erreur lors de la suppression") }
+            }
+        }
+    }
+
+    // CORRECTION : Utiliser la bonne méthode du repository
+    fun updateQuestion(question: Question, newQuestionText: String, newPenalties: Int) {
+        viewModelScope.launch {
+            try {
+                questionRepository.updateCustomQuestion(
+                    gameId = currentGameId,
+                    oldQuestion = question,
+                    newQuestionText = newQuestionText,
+                    newPenalties = newPenalties
+                )
+                // Les données se mettront à jour automatiquement via le Flow
+            } catch (e: Exception) {
+                _viewState.update { it.copy(error = "Erreur lors de la modification") }
             }
         }
     }

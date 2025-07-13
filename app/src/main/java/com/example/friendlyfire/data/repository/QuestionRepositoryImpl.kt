@@ -1,5 +1,4 @@
-// ===== 2. Mise à jour QuestionRepositoryImpl.kt =====
-// Implémentation complète avec système de priorité
+// Fichier: app/src/main/java/com/example/friendlyfire/data/repository/QuestionRepositoryImpl.kt
 
 package com.example.friendlyfire.data.repository
 
@@ -7,7 +6,8 @@ import android.content.Context
 import com.example.friendlyfire.R
 import com.example.friendlyfire.models.Question
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
@@ -19,9 +19,12 @@ class QuestionRepositoryImpl @Inject constructor(
 
     private val questionsFile = File(context.filesDir, "questions.txt")
 
+    // StateFlow pour les questions custom par jeu
+    private val customQuestionsFlows = mutableMapOf<String, MutableStateFlow<List<Question>>>()
+
     // ===== Méthodes existantes =====
 
-    override fun getAllQuestions(): Flow<List<Question>> = flow {
+    override fun getAllQuestions(): Flow<List<Question>> = kotlinx.coroutines.flow.flow {
         emit(loadQuestionsFromFile())
     }
 
@@ -83,22 +86,32 @@ class QuestionRepositoryImpl @Inject constructor(
         }
     }
 
-    // ===== Nouvelles méthodes pour les questions custom =====
+    // ===== Méthodes pour les questions custom avec StateFlow =====
 
-    override fun getCustomQuestionsForGame(gameId: String): Flow<List<Question>> = flow {
-        emit(loadCustomQuestionsForGame(gameId))
+    override fun getCustomQuestionsForGame(gameId: String): Flow<List<Question>> {
+        // Créer ou récupérer le StateFlow pour ce jeu
+        if (!customQuestionsFlows.containsKey(gameId)) {
+            customQuestionsFlows[gameId] = MutableStateFlow(loadCustomQuestionsForGame(gameId))
+        }
+        return customQuestionsFlows[gameId]!!.asStateFlow()
     }
 
     override suspend fun addCustomQuestionForGame(gameId: String, question: Question) {
         val currentQuestions = loadCustomQuestionsForGame(gameId).toMutableList()
         currentQuestions.add(question.copy(isCustom = true))
         saveCustomQuestionsForGame(gameId, currentQuestions)
+
+        // Mettre à jour le StateFlow
+        updateCustomQuestionsFlow(gameId, currentQuestions)
     }
 
     override suspend fun deleteCustomQuestionForGame(gameId: String, question: Question) {
         val currentQuestions = loadCustomQuestionsForGame(gameId).toMutableList()
         currentQuestions.removeAll { it.questionText == question.questionText }
         saveCustomQuestionsForGame(gameId, currentQuestions)
+
+        // Mettre à jour le StateFlow
+        updateCustomQuestionsFlow(gameId, currentQuestions)
     }
 
     override suspend fun updateCustomQuestion(gameId: String, oldQuestion: Question, newQuestionText: String, newPenalties: Int) {
@@ -110,6 +123,9 @@ class QuestionRepositoryImpl @Inject constructor(
                 penalties = newPenalties
             )
             saveCustomQuestionsForGame(gameId, currentQuestions)
+
+            // Mettre à jour le StateFlow
+            updateCustomQuestionsFlow(gameId, currentQuestions)
         }
     }
 
@@ -136,6 +152,10 @@ class QuestionRepositoryImpl @Inject constructor(
     }
 
     // ===== Méthodes privées =====
+
+    private fun updateCustomQuestionsFlow(gameId: String, questions: List<Question>) {
+        customQuestionsFlows[gameId]?.value = questions
+    }
 
     private fun loadQuestionsFromFile(): List<Question> {
         return try {
