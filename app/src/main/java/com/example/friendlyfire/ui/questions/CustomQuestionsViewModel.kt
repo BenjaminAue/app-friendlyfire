@@ -5,6 +5,10 @@ package com.example.friendlyfire.ui.questions
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.friendlyfire.data.repository.QuestionRepository
+import com.example.friendlyfire.data.repository.QuestionAlreadyExistsException
+import com.example.friendlyfire.data.repository.QuestionNotFoundException
+import com.example.friendlyfire.data.repository.QuestionRepositoryException
+import com.example.friendlyfire.data.repository.QuestionValidationException
 import com.example.friendlyfire.models.Question
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +30,7 @@ class CustomQuestionsViewModel @Inject constructor(
 
     fun initializeForGame(gameId: String) {
         currentGameId = gameId
-        _viewState.update { it.copy(isLoading = true) }
+        _viewState.update { it.copy(isLoading = true, error = null) }
         loadCustomQuestionsForGame(gameId)
     }
 
@@ -46,7 +50,7 @@ class CustomQuestionsViewModel @Inject constructor(
                 _viewState.update {
                     it.copy(
                         isLoading = false,
-                        error = "Erreur lors du chargement des questions"
+                        error = "Erreur lors du chargement des questions. Veuillez réessayer."
                     )
                 }
             }
@@ -59,6 +63,8 @@ class CustomQuestionsViewModel @Inject constructor(
             return
         }
 
+        _viewState.update { it.copy(isLoading = true, error = null) }
+
         viewModelScope.launch {
             try {
                 val question = Question(
@@ -67,26 +73,93 @@ class CustomQuestionsViewModel @Inject constructor(
                     isCustom = true
                 )
                 questionRepository.addCustomQuestionForGame(gameId, question)
-                // Les données se mettront à jour automatiquement via le Flow
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = null,
+                        successMessage = "Question ajoutée avec succès !"
+                    )
+                }
+            } catch (e: QuestionValidationException) {
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "La question n'est pas valide"
+                    )
+                }
+            } catch (e: QuestionAlreadyExistsException) {
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Cette question existe déjà"
+                    )
+                }
+            } catch (e: QuestionRepositoryException) {
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "Erreur lors de l'ajout de la question"
+                    )
+                }
             } catch (e: Exception) {
-                _viewState.update { it.copy(error = "Erreur lors de l'ajout de la question") }
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Une erreur inattendue s'est produite. Veuillez réessayer."
+                    )
+                }
             }
         }
     }
 
     fun deleteQuestion(question: Question) {
+        _viewState.update { it.copy(isLoading = true, error = null) }
+
         viewModelScope.launch {
             try {
                 questionRepository.deleteCustomQuestionForGame(currentGameId, question)
-                // Les données se mettront à jour automatiquement via le Flow
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = null,
+                        successMessage = "Question supprimée avec succès !"
+                    )
+                }
+            } catch (e: QuestionNotFoundException) {
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Question non trouvée"
+                    )
+                }
+            } catch (e: QuestionValidationException) {
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "Données de la question invalides"
+                    )
+                }
+            } catch (e: QuestionRepositoryException) {
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "Erreur lors de la suppression de la question"
+                    )
+                }
             } catch (e: Exception) {
-                _viewState.update { it.copy(error = "Erreur lors de la suppression") }
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Une erreur inattendue s'est produite. Veuillez réessayer."
+                    )
+                }
             }
         }
     }
 
-    // CORRECTION : Utiliser la bonne méthode du repository
     fun updateQuestion(question: Question, newQuestionText: String, newPenalties: Int) {
+        _viewState.update { it.copy(isLoading = true, error = null) }
+
         viewModelScope.launch {
             try {
                 questionRepository.updateCustomQuestion(
@@ -95,9 +168,48 @@ class CustomQuestionsViewModel @Inject constructor(
                     newQuestionText = newQuestionText,
                     newPenalties = newPenalties
                 )
-                // Les données se mettront à jour automatiquement via le Flow
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = null,
+                        successMessage = "Question modifiée avec succès !"
+                    )
+                }
+            } catch (e: QuestionNotFoundException) {
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Question non trouvée"
+                    )
+                }
+            } catch (e: QuestionValidationException) {
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "Les nouvelles données ne sont pas valides"
+                    )
+                }
+            } catch (e: QuestionAlreadyExistsException) {
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Une question avec ce texte existe déjà"
+                    )
+                }
+            } catch (e: QuestionRepositoryException) {
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "Erreur lors de la modification de la question"
+                    )
+                }
             } catch (e: Exception) {
-                _viewState.update { it.copy(error = "Erreur lors de la modification") }
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Une erreur inattendue s'est produite. Veuillez réessayer."
+                    )
+                }
             }
         }
     }
@@ -105,10 +217,19 @@ class CustomQuestionsViewModel @Inject constructor(
     fun clearError() {
         _viewState.update { it.copy(error = null) }
     }
+
+    fun clearSuccessMessage() {
+        _viewState.update { it.copy(successMessage = null) }
+    }
+
+    fun retryOperation() {
+        initializeForGame(currentGameId)
+    }
 }
 
 data class CustomQuestionsViewState(
     val customQuestions: List<Question> = emptyList(),
-    val isLoading: Boolean = true,
-    val error: String? = null
+    val isLoading: Boolean = false,
+    val error: String? = null,
+    val successMessage: String? = null
 )

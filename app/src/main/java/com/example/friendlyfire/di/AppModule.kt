@@ -4,10 +4,13 @@
 package com.example.friendlyfire.di
 
 import android.content.Context
+import com.example.friendlyfire.data.database.dao.PlayerDao
+import com.example.friendlyfire.data.database.dao.QuestionDao
+import com.example.friendlyfire.data.migration.MigrationHelper
 import com.example.friendlyfire.data.repository.PlayerRepository
-import com.example.friendlyfire.data.repository.PlayerRepositoryImpl
+import com.example.friendlyfire.data.repository.PlayerRepositoryRoom
 import com.example.friendlyfire.data.repository.QuestionRepository
-import com.example.friendlyfire.data.repository.QuestionRepositoryImpl
+import com.example.friendlyfire.data.repository.QuestionRepositoryRoom
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -22,12 +25,21 @@ object AppModule {
     @Provides
     @Singleton
     fun providePlayerRepository(
-        @ApplicationContext context: Context
-    ): PlayerRepository = PlayerRepositoryImpl(context)
+        playerDao: PlayerDao
+    ): PlayerRepository = PlayerRepositoryRoom(playerDao)
 
     @Provides
     @Singleton
     fun provideQuestionRepository(
-        @ApplicationContext context: Context
-    ): QuestionRepository = QuestionRepositoryImpl(context)
+        @ApplicationContext context: Context,
+        questionDao: QuestionDao
+    ): QuestionRepository = QuestionRepositoryRoom(context, questionDao)
+
+    @Provides
+    @Singleton
+    fun provideMigrationHelper(
+        @ApplicationContext context: Context,
+        playerDao: PlayerDao,
+        questionDao: QuestionDao
+    ): MigrationHelper = MigrationHelper(context, playerDao, questionDao)
 }
