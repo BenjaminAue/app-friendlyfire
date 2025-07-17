@@ -171,11 +171,13 @@ class MainActivity : AppCompatActivity() {
         questionTextView.text = viewModel.getQuestionText()
         questionTextView.visibility = View.VISIBLE
 
-        setupPlayerSelection(state.players)
+        // MODIFICATION : Utiliser selectablePlayers au lieu de players
+        setupPlayerSelection(state.selectablePlayers) // ← CHANGEMENT ICI
         playersLayout.visibility = View.VISIBLE
         validateButton.visibility = View.VISIBLE
         mainLayout.removeAllViews()
     }
+
 
     private fun showCoinTossPhase(state: com.example.friendlyfire.ui.main.MainViewState) {
         showQuestionButton.visibility = View.GONE

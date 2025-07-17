@@ -6,6 +6,7 @@ package com.example.friendlyfire
 import android.app.Application
 import android.util.Log
 import com.example.friendlyfire.data.migration.MigrationHelper
+import com.example.friendlyfire.data.monitoring.DatabaseHealthMonitor
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +19,9 @@ class FriendlyFireApplication : Application() {
 
     @Inject
     lateinit var migrationHelper: MigrationHelper
+
+    @Inject
+    lateinit var databaseHealthMonitor: DatabaseHealthMonitor
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
@@ -37,6 +41,10 @@ class FriendlyFireApplication : Application() {
                 } else {
                     Log.d("FriendlyFireApp", "Migration already up to date")
                 }
+
+                // Démarrer le monitoring de la DB après migration
+                databaseHealthMonitor.startMonitoring()
+
             } catch (e: Exception) {
                 Log.e("FriendlyFireApp", "Error during migration check", e)
             }

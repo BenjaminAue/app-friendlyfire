@@ -7,16 +7,17 @@ import com.example.friendlyfire.data.database.dao.PlayerDao
 import com.example.friendlyfire.data.database.mappers.toPlayer
 import com.example.friendlyfire.data.database.mappers.toPlayerEntity
 import com.example.friendlyfire.data.database.mappers.toPlayers
+import com.example.friendlyfire.data.security.InputSanitizer
+import com.example.friendlyfire.data.security.SanitizedInput
+import com.example.friendlyfire.data.security.SecurityValidationException
 import com.example.friendlyfire.models.Player
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
-// Ajoutez ces imports dans PlayerRepositoryRoom.kt
-import com.example.friendlyfire.data.security.InputSanitizer
-import com.example.friendlyfire.data.security.SanitizedInput
-import com.example.friendlyfire.data.security.SecurityValidationException
 
 class PlayerRepositoryRoom @Inject constructor(
     private val playerDao: PlayerDao
@@ -26,6 +27,12 @@ class PlayerRepositoryRoom @Inject constructor(
         private const val TAG = "PlayerRepositoryRoom"
         private const val MAX_RETRIES = 3
     }
+
+    // Cache en mémoire pour éviter les requêtes fréquentes
+    private val playerCountCache = mutableMapOf<String, Int>()
+    private val cacheMutex = Mutex()
+    private var cacheTimestamp = 0L
+    private val CACHE_VALIDITY_MS = 30_000L // 30 secondes
 
     override fun getAllPlayers(): Flow<List<Player>> {
         return playerDao.getAllPlayers()
@@ -57,6 +64,9 @@ class PlayerRepositoryRoom @Inject constructor(
                 playerDao.insertPlayer(playerEntity)
             }
 
+            // Invalider le cache après ajout
+            invalidateCache()
+
             Log.d(TAG, "Successfully added player: ${validatedPlayer.name}")
 
         } catch (e: PlayerValidationException) {
@@ -84,6 +94,9 @@ class PlayerRepositoryRoom @Inject constructor(
             retryOperation(MAX_RETRIES) {
                 playerDao.deletePlayer(existingPlayer)
             }
+
+            // Invalider le cache après suppression
+            invalidateCache()
 
             Log.d(TAG, "Successfully removed player: ${validatedPlayer.name}")
 
@@ -136,6 +149,10 @@ class PlayerRepositoryRoom @Inject constructor(
             retryOperation(MAX_RETRIES) {
                 playerDao.deleteAllPlayers()
             }
+
+            // Invalider le cache après clear
+            invalidateCache()
+
             Log.d(TAG, "Successfully cleared all players")
 
         } catch (e: Exception) {
@@ -144,7 +161,7 @@ class PlayerRepositoryRoom @Inject constructor(
         }
     }
 
-    // Méthodes supplémentaires spécifiques à Room
+    // Méthodes supplémentaires spécifiques à Room avec cache
     suspend fun updatePlayerLastUsed(playerName: String) {
         try {
             val player = playerDao.getPlayerByName(playerName)
@@ -165,16 +182,45 @@ class PlayerRepositoryRoom @Inject constructor(
 
     suspend fun getPlayerCount(): Int {
         return try {
-            playerDao.getPlayerCount()
+            // Vérifier le cache d'abord
+            val cachedCount = getCachedPlayerCount()
+            if (cachedCount != null) {
+                return cachedCount
+            }
+
+            // Si pas de cache, requête DB et mise en cache
+            val count = playerDao.getPlayerCount()
+            setCachedPlayerCount(count)
+            count
+
         } catch (e: Exception) {
             Log.e(TAG, "Error getting player count", e)
             0 // Fallback
         }
     }
 
-    // Validation des données
+    // Méthodes de cache
+    private suspend fun getCachedPlayerCount(): Int? = cacheMutex.withLock {
+        val now = System.currentTimeMillis()
+        if (now - cacheTimestamp < CACHE_VALIDITY_MS && playerCountCache.containsKey("count")) {
+            playerCountCache["count"]
+        } else {
+            null
+        }
+    }
+
+    private suspend fun setCachedPlayerCount(count: Int) = cacheMutex.withLock {
+        playerCountCache["count"] = count
+        cacheTimestamp = System.currentTimeMillis()
+    }
+
+    private suspend fun invalidateCache() = cacheMutex.withLock {
+        playerCountCache.clear()
+        cacheTimestamp = 0L
+    }
+
+    // Validation des données avec InputSanitizer
     private fun validatePlayer(player: Player): Player {
-        // Utiliser InputSanitizer au lieu de validation manuelle
         val sanitizedName = InputSanitizer.sanitizePlayerName(player.name)
 
         return when (sanitizedName) {

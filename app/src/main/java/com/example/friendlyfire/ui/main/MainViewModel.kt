@@ -49,6 +49,14 @@ class MainViewModel @Inject constructor(
                                 )
                             }
                         }
+                        players.size < 2 -> {
+                            _viewState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    error = "Il faut au moins 2 joueurs pour jouer. Ajoutez d'autres joueurs."
+                                )
+                            }
+                        }
                         prioritizedQuestions.isEmpty() -> {
                             _viewState.update {
                                 it.copy(
@@ -99,11 +107,17 @@ class MainViewModel @Inject constructor(
         // Retirer la question des disponibles
         _availableQuestions.removeAll { it.questionText == question.questionText }
 
+        // Créer la liste des joueurs sélectionnables (exclure le joueur actuel)
+        val selectablePlayers = currentState.players.filter { player ->
+            player.name != currentPlayer.name
+        }
+
         _viewState.update {
             it.copy(
                 currentQuestion = question,
                 gamePhase = GamePhase.QUESTION_SHOWN,
-                availableQuestions = _availableQuestions.toList()
+                availableQuestions = _availableQuestions.toList(),
+                selectablePlayers = selectablePlayers
             )
         }
     }
@@ -127,11 +141,12 @@ class MainViewModel @Inject constructor(
         // Ajouter la question au joueur sélectionné
         selectedPlayer.questions.add(currentQuestion)
 
-        // CORRECTION : Le joueur sélectionné deviendra le joueur actuel APRÈS le lancer de pièce
+        // Le joueur sélectionné deviendra le joueur actuel APRÈS le lancer de pièce
         _viewState.update {
             it.copy(
                 gamePhase = GamePhase.COIN_TOSS,
-                selectedPlayer = selectedPlayer, // Garde le joueur sélectionné pour après
+                selectedPlayer = selectedPlayer,
+                selectablePlayers = emptyList(), // Reset la liste sélectionnable
                 error = null
             )
         }
@@ -140,7 +155,7 @@ class MainViewModel @Inject constructor(
     fun tossCoin() {
         val currentState = _viewState.value
         val currentQuestion = currentState.currentQuestion ?: return
-        val selectedPlayer = currentState.selectedPlayer ?: return // Le joueur qui a été sélectionné
+        val selectedPlayer = currentState.selectedPlayer ?: return
 
         val coinResult = gameUseCase.tossCoin()
 
@@ -155,12 +170,12 @@ class MainViewModel @Inject constructor(
             }
         }
 
-        // CORRECTION : Le joueur sélectionné devient maintenant le joueur actuel
+        // Le joueur sélectionné devient maintenant le joueur actuel
         _viewState.update {
             it.copy(
-                currentPlayer = selectedPlayer, // ← CHANGEMENT ICI
+                currentPlayer = selectedPlayer,
                 coinResult = coinResult,
-                gamePhase = GamePhase.COIN_TOSS // Reste en coin_toss pour afficher le résultat
+                gamePhase = GamePhase.COIN_TOSS
             )
         }
     }
@@ -178,8 +193,8 @@ class MainViewModel @Inject constructor(
                     gamePhase = GamePhase.WAITING_QUESTION,
                     currentQuestion = null,
                     coinResult = null,
-                    selectedPlayer = null
-                    // currentPlayer reste le même (le joueur sélectionné de la question précédente)
+                    selectedPlayer = null,
+                    selectablePlayers = emptyList() // Reset la liste sélectionnable
                 )
             }
         }
@@ -201,7 +216,8 @@ class MainViewModel @Inject constructor(
         _viewState.update {
             it.copy(
                 gamePhase = GamePhase.GAME_OVER,
-                gameStats = gameStats
+                gameStats = gameStats,
+                selectablePlayers = emptyList() // Reset la liste sélectionnable
             )
         }
     }
@@ -226,7 +242,8 @@ class MainViewModel @Inject constructor(
                         availableQuestions = questions,
                         currentPlayer = startingPlayer,
                         totalTurns = it.totalTurns,
-                        gamePhase = GamePhase.WAITING_QUESTION
+                        gamePhase = GamePhase.WAITING_QUESTION,
+                        selectablePlayers = emptyList()
                     )
                 }
             }

@@ -9,6 +9,7 @@ import com.example.friendlyfire.models.Question
 data class MainViewState(
     val isLoading: Boolean = false,
     val players: List<Player> = emptyList(),
+    val selectablePlayers: List<Player> = emptyList(), // ← NOUVEAU : joueurs sélectionnables (sans le joueur actuel)
     val availableQuestions: List<Question> = emptyList(),
     val currentPlayer: Player? = null,
     val currentQuestion: Question? = null,

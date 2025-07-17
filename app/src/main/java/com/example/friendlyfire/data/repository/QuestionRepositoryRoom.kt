@@ -10,6 +10,9 @@ import com.example.friendlyfire.data.database.entities.QuestionEntity
 import com.example.friendlyfire.data.database.mappers.toQuestion
 import com.example.friendlyfire.data.database.mappers.toQuestionEntity
 import com.example.friendlyfire.data.database.mappers.toQuestions
+import com.example.friendlyfire.data.security.InputSanitizer
+import com.example.friendlyfire.data.security.SanitizedInput
+import com.example.friendlyfire.data.security.SecurityValidationException
 import com.example.friendlyfire.models.Question
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -19,10 +22,6 @@ import kotlinx.coroutines.flow.map
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import javax.inject.Inject
-// Ajoutez ces imports dans PlayerRepositoryRoom.kt
-import com.example.friendlyfire.data.security.InputSanitizer
-import com.example.friendlyfire.data.security.SanitizedInput
-import com.example.friendlyfire.data.security.SecurityValidationException
 
 class QuestionRepositoryRoom @Inject constructor(
     private val context: Context,
