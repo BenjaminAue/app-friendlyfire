@@ -1,3 +1,5 @@
+// Fichier: app/src/main/java/com/example/friendlyfire/domain/usecase/GameUseCase.kt
+
 package com.example.friendlyfire.domain.usecase
 
 import com.example.friendlyfire.data.repository.PlayerRepository
@@ -24,8 +26,17 @@ class GameUseCase @Inject constructor(
         }
     }
 
-    // Obtenir les questions avec priorité
+    // Obtenir les questions avec priorité - SÉCURISÉ avec validation gameId
     suspend fun getQuestionsWithPriority(gameId: String, totalTurns: Int): List<Question> {
+        // Validation gameId côté UseCase aussi
+        if (gameId.isBlank()) {
+            throw IllegalArgumentException("GameId ne peut pas être vide")
+        }
+
+        if (totalTurns <= 0) {
+            throw IllegalArgumentException("Le nombre de tours doit être positif")
+        }
+
         return questionRepository.getQuestionsForGameWithPriority(gameId, totalTurns)
     }
 

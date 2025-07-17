@@ -1,5 +1,4 @@
-// ===== 1. Mise à jour de ManageQuestionsActivity =====
-// Modification complète pour afficher seulement les questions custom
+// Fichier: app/src/main/java/com/example/friendlyfire/ManageQuestionsActivity.kt
 
 package com.example.friendlyfire
 
@@ -17,6 +16,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.friendlyfire.adapters.CustomQuestionAdapter
 import com.example.friendlyfire.models.Question
 import com.example.friendlyfire.ui.questions.CustomQuestionsViewModel
+import com.example.friendlyfire.ui.common.SecureInputTextWatcher
+import com.example.friendlyfire.ui.common.addSecureValidation
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
@@ -53,8 +54,7 @@ class ManageQuestionsActivity : AppCompatActivity() {
     }
 
     private fun initializeViews() {
-        // S'assurer que tous ces IDs existent dans le layout
-        questionsRecyclerView = findViewById(R.id.questionRecyclerView) // ← Vérifiez cet ID
+        questionsRecyclerView = findViewById(R.id.questionRecyclerView)
         addQuestionButton = findViewById(R.id.addQuestionButton)
         questionsCountTextView = findViewById(R.id.questionsCountTextView)
         backButton = findViewById(R.id.backButton)
@@ -81,7 +81,6 @@ class ManageQuestionsActivity : AppCompatActivity() {
         }
 
         backButton.setOnClickListener {
-            // Retourner vers GameConfigActivity avec les bons paramètres
             val intent = Intent(this, GameConfigActivity::class.java)
             intent.putExtra("GAME_INFO", createGameInfoFromId(gameId, gameName))
             intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -90,7 +89,6 @@ class ManageQuestionsActivity : AppCompatActivity() {
         }
     }
 
-    // Méthode helper pour créer GameInfo
     private fun createGameInfoFromId(gameId: String, gameName: String): com.example.friendlyfire.ui.home.GameInfo {
         return com.example.friendlyfire.ui.home.GameInfo(
             id = gameId,
@@ -115,6 +113,10 @@ class ManageQuestionsActivity : AppCompatActivity() {
         val questionEditText = dialogView.findViewById<EditText>(R.id.questionEditText)
         val penaltySpinner = dialogView.findViewById<Spinner>(R.id.penaltySpinner)
 
+        // Variables pour validation
+        var isQuestionValid = true
+        var questionValidationError: String? = null
+
         // Configurer le spinner
         setupPenaltySpinner(penaltySpinner)
 
@@ -124,43 +126,53 @@ class ManageQuestionsActivity : AppCompatActivity() {
             else -> "Entrez votre question..."
         }
 
-        AlertDialog.Builder(this)
+        // Ajouter validation sécurisée en temps réel pour la question
+        questionEditText.addSecureValidation(
+            SecureInputTextWatcher.InputType.QUESTION_TEXT
+        ) { isValid, errorMessage ->
+            isQuestionValid = isValid
+            questionValidationError = errorMessage
+        }
+
+        val dialog = AlertDialog.Builder(this)
             .setTitle("✨ Nouvelle question pour $gameName")
             .setView(dialogView)
             .setPositiveButton("Ajouter") { _, _ ->
                 val questionText = questionEditText.text.toString().trim()
                 val penalties = (penaltySpinner.selectedItem as Int)
 
-                if (questionText.isNotEmpty()) {
-                    // Le ViewModel va automatiquement recharger la liste
-                    viewModel.addQuestionForGame(gameId, questionText, penalties)
-                    Toast.makeText(this, "Question ajoutée !", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this, "Veuillez entrer une question", Toast.LENGTH_SHORT).show()
+                // Validation finale
+                if (!isQuestionValid) {
+                    Toast.makeText(this, questionValidationError ?: "Question invalide", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
                 }
+
+                if (questionText.isEmpty()) {
+                    Toast.makeText(this, "Veuillez entrer une question", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
+                if (questionText.length < 10) {
+                    Toast.makeText(this, "La question doit contenir au moins 10 caractères", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
+                viewModel.addQuestionForGame(gameId, questionText, penalties)
+                Toast.makeText(this, "Question ajoutée !", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Annuler", null)
             .create()
-            .show()
-    }
 
-    private fun updateUI(state: com.example.friendlyfire.ui.questions.CustomQuestionsViewState) {
-        // Mettre à jour la liste - FORCER la mise à jour
-        customQuestionAdapter.updateQuestions(state.customQuestions)
-        customQuestionAdapter.notifyDataSetChanged() // Forcer le rafraîchissement
+        dialog.show()
 
-        // Mettre à jour le compteur
-        val count = state.customQuestions.size
-        questionsCountTextView.text = when (count) {
-            0 -> "🎯 Aucune question personnalisée"
-            1 -> "🎯 1 question personnalisée"
-            else -> "🎯 $count questions personnalisées"
-        }
-
-        // Gérer les erreurs
-        state.error?.let { error ->
-            Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
-            viewModel.clearError()
+        // Gérer l'état du bouton OK
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.let { okButton ->
+            questionEditText.addSecureValidation(
+                SecureInputTextWatcher.InputType.QUESTION_TEXT
+            ) { isValid, _ ->
+                val text = questionEditText.text.toString().trim()
+                okButton.isEnabled = isValid && text.isNotEmpty() && text.length >= 10
+            }
         }
     }
 
@@ -168,6 +180,10 @@ class ManageQuestionsActivity : AppCompatActivity() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_add_question, null)
         val questionEditText = dialogView.findViewById<EditText>(R.id.questionEditText)
         val penaltySpinner = dialogView.findViewById<Spinner>(R.id.penaltySpinner)
+
+        // Variables pour validation
+        var isQuestionValid = true
+        var questionValidationError: String? = null
 
         // Pré-remplir avec les valeurs actuelles
         questionEditText.setText(question.questionText)
@@ -177,22 +193,53 @@ class ManageQuestionsActivity : AppCompatActivity() {
         val penaltyPosition = (question.penalties - 1).coerceIn(0, 9)
         penaltySpinner.setSelection(penaltyPosition)
 
-        AlertDialog.Builder(this)
+        // Ajouter validation sécurisée
+        questionEditText.addSecureValidation(
+            SecureInputTextWatcher.InputType.QUESTION_TEXT
+        ) { isValid, errorMessage ->
+            isQuestionValid = isValid
+            questionValidationError = errorMessage
+        }
+
+        val dialog = AlertDialog.Builder(this)
             .setTitle("✏️ Modifier la question")
             .setView(dialogView)
             .setPositiveButton("Modifier") { _, _ ->
                 val questionText = questionEditText.text.toString().trim()
                 val penalties = (penaltySpinner.selectedItem as Int)
 
-                if (questionText.isNotEmpty()) {
-                    viewModel.updateQuestion(question, questionText, penalties)
-                } else {
-                    Toast.makeText(this, "Veuillez entrer une question", Toast.LENGTH_SHORT).show()
+                // Validation finale
+                if (!isQuestionValid) {
+                    Toast.makeText(this, questionValidationError ?: "Question invalide", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
                 }
+
+                if (questionText.isEmpty()) {
+                    Toast.makeText(this, "Veuillez entrer une question", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
+                if (questionText.length < 10) {
+                    Toast.makeText(this, "La question doit contenir au moins 10 caractères", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
+                viewModel.updateQuestion(question, questionText, penalties)
             }
             .setNegativeButton("Annuler", null)
             .create()
-            .show()
+
+        dialog.show()
+
+        // Gérer l'état du bouton OK
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.let { okButton ->
+            questionEditText.addSecureValidation(
+                SecureInputTextWatcher.InputType.QUESTION_TEXT
+            ) { isValid, _ ->
+                val text = questionEditText.text.toString().trim()
+                okButton.isEnabled = isValid && text.isNotEmpty() && text.length >= 10
+            }
+        }
     }
 
     private fun showDeleteConfirmation(question: Question) {
@@ -214,9 +261,35 @@ class ManageQuestionsActivity : AppCompatActivity() {
         spinner.adapter = adapter
         spinner.setSelection(2) // Par défaut 3 pénalités
     }
+
+    private fun updateUI(state: com.example.friendlyfire.ui.questions.CustomQuestionsViewState) {
+        // Mettre à jour la liste
+        customQuestionAdapter.updateQuestions(state.customQuestions)
+        customQuestionAdapter.notifyDataSetChanged()
+
+        // Mettre à jour le compteur
+        val count = state.customQuestions.size
+        questionsCountTextView.text = when (count) {
+            0 -> "🎯 Aucune question personnalisée"
+            1 -> "🎯 1 question personnalisée"
+            else -> "🎯 $count questions personnalisées"
+        }
+
+        // Gérer les erreurs
+        state.error?.let { error ->
+            Toast.makeText(this, error, Toast.LENGTH_LONG).show()
+            viewModel.clearError()
+        }
+
+        // Gérer les messages de succès
+        state.successMessage?.let { message ->
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+            viewModel.clearSuccessMessage()
+        }
+    }
+
     override fun onResume() {
         super.onResume()
-        // Rafraîchir les questions à chaque retour sur l'écran
         viewModel.initializeForGame(gameId)
     }
 }

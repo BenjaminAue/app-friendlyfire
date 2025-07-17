@@ -1,4 +1,3 @@
-// ===== 4. ManagePlayersActivity refactorisée =====
 // Fichier: app/src/main/java/com/example/friendlyfire/ManagePlayersActivity.kt
 
 package com.example.friendlyfire
@@ -17,6 +16,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.friendlyfire.adapters.PlayerAdapter
 import com.example.friendlyfire.models.Player
 import com.example.friendlyfire.ui.players.ManagePlayersViewModel
+import com.example.friendlyfire.ui.common.SecureInputTextWatcher
+import com.example.friendlyfire.ui.common.addSecureValidation
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
@@ -72,8 +73,14 @@ class ManagePlayersActivity : AppCompatActivity() {
 
         // Gérer les erreurs
         state.error?.let { error ->
-            Toast.makeText(this, error, Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, error, Toast.LENGTH_LONG).show()
             viewModel.clearError()
+        }
+
+        // Gérer les messages de succès
+        state.successMessage?.let { message ->
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+            viewModel.clearSuccessMessage()
         }
     }
 
@@ -81,15 +88,48 @@ class ManagePlayersActivity : AppCompatActivity() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_player, null)
         val playerNameEditText = dialogView.findViewById<EditText>(R.id.playerNameEditText)
 
-        AlertDialog.Builder(this)
+        var isInputValid = true
+        var validationError: String? = null
+
+        // Ajouter validation sécurisée en temps réel
+        playerNameEditText.addSecureValidation(
+            SecureInputTextWatcher.InputType.PLAYER_NAME
+        ) { isValid, errorMessage ->
+            isInputValid = isValid
+            validationError = errorMessage
+        }
+
+        val dialog = AlertDialog.Builder(this)
             .setTitle("Ajouter un joueur")
             .setView(dialogView)
             .setPositiveButton("Ajouter") { _, _ ->
                 val playerName = playerNameEditText.text.toString()
+
+                // Validation finale avant envoi
+                if (!isInputValid) {
+                    Toast.makeText(this, validationError ?: "Nom invalide", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+
+                if (playerName.isBlank()) {
+                    Toast.makeText(this, "Veuillez entrer un nom", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
                 viewModel.addPlayer(playerName)
             }
             .setNegativeButton("Annuler", null)
             .create()
-            .show()
+
+        dialog.show()
+
+        // Désactiver le bouton OK si l'input n'est pas valide
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.let { okButton ->
+            playerNameEditText.addSecureValidation(
+                SecureInputTextWatcher.InputType.PLAYER_NAME
+            ) { isValid, _ ->
+                okButton.isEnabled = isValid && playerNameEditText.text.toString().isNotBlank()
+            }
+        }
     }
 }

@@ -9,6 +9,7 @@ import com.example.friendlyfire.data.repository.PlayerAlreadyExistsException
 import com.example.friendlyfire.data.repository.PlayerNotFoundException
 import com.example.friendlyfire.data.repository.PlayerRepositoryException
 import com.example.friendlyfire.data.repository.PlayerValidationException
+import com.example.friendlyfire.data.security.SecurityValidationException
 import com.example.friendlyfire.models.Player
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,6 +57,7 @@ class ManagePlayersViewModel @Inject constructor(
     }
 
     fun addPlayer(name: String) {
+        // Validation côté ViewModel aussi pour feedback immédiat
         if (name.isBlank()) {
             _viewState.update { it.copy(error = "Le nom du joueur ne peut pas être vide") }
             return
@@ -78,6 +80,14 @@ class ManagePlayersViewModel @Inject constructor(
                     it.copy(
                         isLoading = false,
                         error = e.message ?: "Le nom du joueur n'est pas valide"
+                    )
+                }
+            } catch (e: SecurityValidationException) {
+                // Gestion spécifique des erreurs de sécurité InputSanitizer
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "Le nom contient des caractères non autorisés"
                     )
                 }
             } catch (e: PlayerAlreadyExistsException) {
@@ -130,6 +140,13 @@ class ManagePlayersViewModel @Inject constructor(
                     it.copy(
                         isLoading = false,
                         error = e.message ?: "Données du joueur invalides"
+                    )
+                }
+            } catch (e: SecurityValidationException) {
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "Données de sécurité invalides"
                     )
                 }
             } catch (e: PlayerRepositoryException) {

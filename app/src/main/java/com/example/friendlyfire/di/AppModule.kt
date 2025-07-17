@@ -1,4 +1,3 @@
-// ===== 2. Module de Dependency Injection =====
 // Fichier: app/src/main/java/com/example/friendlyfire/di/AppModule.kt
 
 package com.example.friendlyfire.di

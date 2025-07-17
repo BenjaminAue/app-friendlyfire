@@ -9,6 +9,7 @@ import com.example.friendlyfire.data.repository.QuestionAlreadyExistsException
 import com.example.friendlyfire.data.repository.QuestionNotFoundException
 import com.example.friendlyfire.data.repository.QuestionRepositoryException
 import com.example.friendlyfire.data.repository.QuestionValidationException
+import com.example.friendlyfire.data.security.SecurityValidationException
 import com.example.friendlyfire.models.Question
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,8 +59,19 @@ class CustomQuestionsViewModel @Inject constructor(
     }
 
     fun addQuestionForGame(gameId: String, questionText: String, penalties: Int) {
+        // Validation côté ViewModel pour feedback immédiat
         if (questionText.isBlank()) {
             _viewState.update { it.copy(error = "La question ne peut pas être vide") }
+            return
+        }
+
+        if (questionText.length < 10) {
+            _viewState.update { it.copy(error = "La question doit contenir au moins 10 caractères") }
+            return
+        }
+
+        if (penalties < 1 || penalties > 20) {
+            _viewState.update { it.copy(error = "Les pénalités doivent être entre 1 et 20") }
             return
         }
 
@@ -85,6 +97,14 @@ class CustomQuestionsViewModel @Inject constructor(
                     it.copy(
                         isLoading = false,
                         error = e.message ?: "La question n'est pas valide"
+                    )
+                }
+            } catch (e: SecurityValidationException) {
+                // Gestion spécifique des erreurs de sécurité InputSanitizer
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "La question contient du contenu non autorisé"
                     )
                 }
             } catch (e: QuestionAlreadyExistsException) {
@@ -139,6 +159,13 @@ class CustomQuestionsViewModel @Inject constructor(
                         error = e.message ?: "Données de la question invalides"
                     )
                 }
+            } catch (e: SecurityValidationException) {
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "Données de sécurité invalides"
+                    )
+                }
             } catch (e: QuestionRepositoryException) {
                 _viewState.update {
                     it.copy(
@@ -158,6 +185,22 @@ class CustomQuestionsViewModel @Inject constructor(
     }
 
     fun updateQuestion(question: Question, newQuestionText: String, newPenalties: Int) {
+        // Validation côté ViewModel
+        if (newQuestionText.isBlank()) {
+            _viewState.update { it.copy(error = "La question ne peut pas être vide") }
+            return
+        }
+
+        if (newQuestionText.length < 10) {
+            _viewState.update { it.copy(error = "La question doit contenir au moins 10 caractères") }
+            return
+        }
+
+        if (newPenalties < 1 || newPenalties > 20) {
+            _viewState.update { it.copy(error = "Les pénalités doivent être entre 1 et 20") }
+            return
+        }
+
         _viewState.update { it.copy(isLoading = true, error = null) }
 
         viewModelScope.launch {
@@ -187,6 +230,13 @@ class CustomQuestionsViewModel @Inject constructor(
                     it.copy(
                         isLoading = false,
                         error = e.message ?: "Les nouvelles données ne sont pas valides"
+                    )
+                }
+            } catch (e: SecurityValidationException) {
+                _viewState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = e.message ?: "La question contient du contenu non autorisé"
                     )
                 }
             } catch (e: QuestionAlreadyExistsException) {
